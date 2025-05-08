@@ -1,5 +1,4 @@
-import { Dispatch } from 'redux';
-import type { AnyAction } from 'redux';
+import { Dispatch, AnyAction } from 'redux';
 import { message } from 'antd';
 import { getDestinations, getDestinationById } from '@/services/DiemDen/api';
 
@@ -11,8 +10,8 @@ export type Effect = (
 	action: AnyAction,
 	effects: {
 		put: (action: AnyAction) => void;
-		call: (fn: (...args: any[]) => any, ...args: any[]) => any;
-		select: (selector: (state: any) => any) => any;
+		call: Function;
+		select: Function;
 	},
 ) => Generator<any, void, unknown>;
 
@@ -98,8 +97,8 @@ const TripModel: TripModelType = {
 		*addDestinationToItinerary(action: AnyAction, { call, put, select }: { call: any; put: any; select: any }) {
 			const { destinationId, day, order } = action.payload || {};
 			// Type assertion for the select result
-			const tripState = yield select((rootState: any) => rootState.trip);
-			const itinerary = (tripState as TripState).selectedDestinations;
+			const state = yield select((state: any) => state.trip);
+			const itinerary = (state as TripState).selectedDestinations;
 
 			// Create new itinerary item
 			const newItem: ItineraryItem = {
@@ -131,8 +130,8 @@ const TripModel: TripModelType = {
 		*removeDestinationFromItinerary(action: AnyAction, { put, select }: { put: any; select: any }) {
 			const { destinationId, day } = action.payload || {};
 			// Type assertion for the select result
-			const tripState = yield select((rootState: any) => rootState.trip);
-			const itinerary = (tripState as TripState).selectedDestinations;
+			const state = yield select((state: any) => state.trip);
+			const itinerary = (state as TripState).selectedDestinations;
 
 			const updatedItinerary = itinerary.filter(
 				(item: ItineraryItem) => !(item.destinationId === destinationId && item.day === day),
@@ -158,8 +157,8 @@ const TripModel: TripModelType = {
 
 		*updateBudget(_: AnyAction, { put, select }: { put: any; select: any }) {
 			// Type assertion for the select result
-			const rootState = yield select((rootState: any) => rootState);
-			const tripState = (rootState as any).trip as TripState;
+			const state = yield select((state: any) => state);
+			const tripState = (state as any).trip as TripState;
 			const { selectedDestinations, destinations } = tripState;
 
 			// Initialize budget categories

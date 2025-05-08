@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PageContainer } from '@ant-design/pro-layout';
-import { connect, Link } from 'umi';
-import type { Dispatch } from 'umi';
+import { connect, Dispatch, Link } from 'umi';
 import {
 	Card,
 	Row,
@@ -20,7 +19,7 @@ import {
 	Tag,
 } from 'antd';
 import { ArrowLeftOutlined, DollarOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import type { TripState } from '@/models/trip-planner';
+import { TripState } from '@/models/trip-planner';
 import DonutChart from '@/components/Chart/DonutChart';
 import styles from './styles.less';
 
@@ -54,7 +53,7 @@ interface DestinationBudget {
 
 const NganSach: React.FC<BudgetProps> = ({ trip, dispatch }) => {
 	const [budgetForm] = Form.useForm();
-	const [localBudgetLimit, setBudgetLimit] = useState<number>(trip.budgetLimit || 0);
+	const [budgetLimit, setBudgetLimit] = useState<number>(trip.budgetLimit || 0);
 	const [isOverBudget, setIsOverBudget] = useState<boolean>(false);
 
 	useEffect(() => {

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PageContainer } from '@ant-design/pro-layout';
 import { connect, Dispatch, history, Link } from 'umi';
-import type { Dispatch as UmiDispatch } from 'umi';
 import {
 	Button,
 	Card,
@@ -22,7 +21,7 @@ import {
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { ArrowRightOutlined, DeleteOutlined, PlusOutlined, UserOutlined, CalendarOutlined } from '@ant-design/icons';
 import moment from 'moment';
-import type { TripState, ItineraryItem } from '@/models/trip-planner';
+import { TripState, ItineraryItem } from '@/models/trip-planner';
 import styles from './styles.less';
 
 const { Title, Text } = Typography;
@@ -103,50 +102,83 @@ const TaoDuLich: React.FC<TaoDuLichProps> = ({ trip, dispatch, loading }) => {
 
 		if (!sourceItem) return;
 
-		// Remove the source item
-		const filteredItinerary = newItinerary.filter(
-			(item) => !(item.day === sourceDay && item.order === source.index + 1),
-		);
+		if (sourceDay === destinationDay) {
+			// Reordering within the same day
+			const dayItems = newItinerary.filter((item) => item.day === sourceDay);
+			const otherItems = newItinerary.filter((item) => item.day !== sourceDay);
 
-		// Update order for source day items
-		const updatedSourceDayItems = filteredItinerary
-			.filter((item) => item.day === sourceDay)
-			.map((item) => ({
+			// Remove the dragged item
+			const updatedDayItems = dayItems.filter((item) => !(item.day === sourceDay && item.order === source.index + 1));
+
+			// Insert the dragged item at the new position
+			updatedDayItems.splice(destination.index, 0, {
+				...sourceItem,
+				order: destination.index + 1,
+			});
+
+			// Update orders for all items in the day
+			const reorderedDayItems = updatedDayItems.map((item, index) => ({
 				...item,
-				order: item.order > source.index + 1 ? item.order - 1 : item.order,
+				order: index + 1,
 			}));
 
-		// Filter out the source day items
-		const restItems = filteredItinerary.filter((item) => item.day !== sourceDay);
+			// Combine all items
+			const combinedItems = [...otherItems, ...reorderedDayItems];
 
-		// Insert the dragged item at the destination
-		const draggedItem = {
-			...sourceItem,
-			day: destinationDay,
-			order: destination.index + 1,
-		};
+			// Update the itinerary
+			dispatch({
+				type: 'trip/reorderItinerary',
+				payload: {
+					itinerary: combinedItems,
+				},
+			});
+		} else {
+			// Moving between different days
+			// Remove the source item
+			const filteredItinerary = newItinerary.filter(
+				(item) => !(item.day === sourceDay && item.order === source.index + 1),
+			);
 
-		// Update order for destination day items (after insertion point)
-		const updatedDestDayItems = filteredItinerary
-			.filter((item) => item.day === destinationDay)
-			.map((item) => ({
-				...item,
-				order: item.order >= destination.index + 1 ? item.order + 1 : item.order,
-			}));
+			// Update order for source day items
+			const updatedSourceDayItems = filteredItinerary
+				.filter((item) => item.day === sourceDay)
+				.map((item) => ({
+					...item,
+					order: item.order > source.index + 1 ? item.order - 1 : item.order,
+				}));
 
-		// Filter out the destination day items
-		const restItems2 = restItems.filter((item) => item.day !== destinationDay);
+			// Filter out the source day items
+			const restItems = filteredItinerary.filter((item) => item.day !== sourceDay);
 
-		// Combine all items
-		const combinedItems = [...restItems2, ...updatedSourceDayItems, ...updatedDestDayItems, draggedItem];
+			// Insert the dragged item at the destination
+			const draggedItem = {
+				...sourceItem,
+				day: destinationDay,
+				order: destination.index + 1,
+			};
 
-		// Update the itinerary
-		dispatch({
-			type: 'trip/reorderItinerary',
-			payload: {
-				itinerary: combinedItems,
-			},
-		});
+			// Update order for destination day items
+			const updatedDestDayItems = filteredItinerary
+				.filter((item) => item.day === destinationDay)
+				.map((item) => ({
+					...item,
+					order: item.order >= destination.index + 1 ? item.order + 1 : item.order,
+				}));
+
+			// Filter out the destination day items
+			const restItems2 = restItems.filter((item) => item.day !== destinationDay);
+
+			// Combine all items
+			const combinedItems = [...restItems2, ...updatedSourceDayItems, ...updatedDestDayItems, draggedItem];
+
+			// Update the itinerary
+			dispatch({
+				type: 'trip/reorderItinerary',
+				payload: {
+					itinerary: combinedItems,
+				},
+			});
+		}
 	};
 
 	const handleDateChange = (dates: any) => {
@@ -207,11 +239,11 @@ const TaoDuLich: React.FC<TaoDuLichProps> = ({ trip, dispatch, loading }) => {
 					Ngày {day} - {date}
 				</Title>
 				<Droppable droppableId={`day-${day}`}>
-					{(droppableProvided, droppableSnapshot) => (
+					{(provided, snapshot) => (
 						<div
-							ref={droppableProvided.innerRef}
-							{...droppableProvided.droppableProps}
-							className={`${styles.droppableArea} ${droppableSnapshot.isDraggingOver ? styles.draggingOver : ''}`}
+							ref={provided.innerRef}
+							{...provided.droppableProps}
+							className={`${styles.droppableArea} ${snapshot.isDraggingOver ? styles.draggingOver : ''}`}
 						>
 							{dayItinerary.length === 0 ? (
 								<Empty description='Chưa có điểm đến cho ngày này' />
@@ -226,12 +258,12 @@ const TaoDuLich: React.FC<TaoDuLichProps> = ({ trip, dispatch, loading }) => {
 											draggableId={`${item.destinationId}-${item.day}`}
 											index={index}
 										>
-											{(draggableProvided, draggableSnapshot) => (
+											{(provided, snapshot) => (
 												<div
-													ref={draggableProvided.innerRef}
-													{...draggableProvided.draggableProps}
-													{...draggableProvided.dragHandleProps}
-													className={`${styles.itineraryItem} ${draggableSnapshot.isDragging ? styles.dragging : ''}`}
+													ref={provided.innerRef}
+													{...provided.draggableProps}
+													{...provided.dragHandleProps}
+													className={`${styles.itineraryItem} ${snapshot.isDragging ? styles.dragging : ''}`}
 												>
 													<div className={styles.itineraryItemContent}>
 														<div className={styles.itineraryOrder}>{index + 1}</div>
@@ -256,7 +288,7 @@ const TaoDuLich: React.FC<TaoDuLichProps> = ({ trip, dispatch, loading }) => {
 									);
 								})
 							)}
-							{droppableProvided.placeholder}
+							{provided.placeholder}
 						</div>
 					)}
 				</Droppable>
