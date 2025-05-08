@@ -53,6 +53,7 @@
   ],
   "dependencies": {
     "@ant-design/icons": "~4.5.0",
+    "@ant-design/plots": "^2.3.3",
     "@ant-design/pro-layout": "~6.15.3",
     "@monaco-editor/react": "^4.6.0",
     "@sentry/react": "^7.65.0",

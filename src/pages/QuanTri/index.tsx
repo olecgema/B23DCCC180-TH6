@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useModel } from 'umi';
 import { Card, Modal, Space, Input, Button, Tabs, Popconfirm, Tag, Select } from 'antd';
-import { AppstoreOutlined, UnorderedListOutlined, PlusCircleOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, UnorderedListOutlined, PlusCircleOutlined, EditOutlined, DeleteOutlined, SearchOutlined, LineChartOutlined } from '@ant-design/icons';
 import ButtonExtend from '@/components/Table/ButtonExtend';
 import TableBase from '@/components/Table';
 import FormDiemDen from './Form';
 import CardView from './CardView';
+import Statistics from './Statistics'; // Import the new Statistics component
 import moment from 'moment';
 import type { IColumn } from '@/components/Table/typing';
 import './index.less';
+
+const { TabPane } = Tabs;
 
 const DiemDen = () => {
   const { 
@@ -29,6 +32,7 @@ const DiemDen = () => {
 
   const [danhSach, setDanhSach] = useState<DiemDen.IDestination[]>(initialDanhSach || []);
   const [searchType, setSearchType] = useState<string | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState<string>("destinations"); // New state for active tab
 
   useEffect(() => {
     const fetchData = async () => {
@@ -235,78 +239,110 @@ const DiemDen = () => {
     }
   ];
 
+  // Render destinations tab content
+  const renderDestinationsTab = () => (
+    <Card
+      title="Quản lý điểm đến"
+      extra={
+        <Space>
+          <Space>
+            <Input.Search
+              placeholder="Tìm kiếm điểm đến"
+              allowClear
+              onSearch={handleSearch}
+              style={{ width: 250 }}
+            />
+            <Select
+              placeholder="Loại điểm đến"
+              style={{ width: 150 }}
+              allowClear
+              onChange={handleTypeChange}
+            >
+              <Select.Option value="beach">Bãi biển</Select.Option>
+              <Select.Option value="mountain">Núi</Select.Option>
+              <Select.Option value="city">Thành phố</Select.Option>
+            </Select>
+          </Space>
+          <Button.Group>
+            <Button
+              type={viewMode === 'card' ? 'primary' : 'default'}
+              icon={<AppstoreOutlined />}
+              onClick={() => setViewMode('card')}
+            >
+              Thẻ
+            </Button>
+            <Button
+              type={viewMode === 'table' ? 'primary' : 'default'}
+              icon={<UnorderedListOutlined />}
+              onClick={() => setViewMode('table')}
+            >
+              Bảng
+            </Button>
+          </Button.Group>
+          <ButtonExtend
+            onClick={handleAdd}
+            icon={<PlusCircleOutlined />}
+            type="primary"
+          >
+            Thêm mới
+          </ButtonExtend>
+        </Space>
+      }
+    >
+      {viewMode === 'card' ? (
+        <CardView
+          dataSource={danhSach || []}
+          loading={loading}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      ) : (
+        <TableBase
+          modelName="destination.destination"
+          columns={columns}
+          loading={loading}
+          rowKey="id"
+          scroll={{ x: 1800 }}
+          pagination={{
+            showSizeChanger: true,
+            showTotal: (total: number) => `Tổng số: ${total}`,
+          }}
+          buttons={{ create: false }}
+        />
+      )}
+    </Card>
+  );
+
   return (
     <>
-      <Card
-        title="Quản lý điểm đến"
-        extra={
-          <Space>
-            <Space>
-              <Input.Search
-                placeholder="Tìm kiếm điểm đến"
-                allowClear
-                onSearch={handleSearch}
-                style={{ width: 250 }}
-              />
-              <Select
-                placeholder="Loại điểm đến"
-                style={{ width: 150 }}
-                allowClear
-                onChange={handleTypeChange}
-              >
-                <Select.Option value="beach">Bãi biển</Select.Option>
-                <Select.Option value="mountain">Núi</Select.Option>
-                <Select.Option value="city">Thành phố</Select.Option>
-              </Select>
-            </Space>
-            <Button.Group>
-              <Button
-                type={viewMode === 'card' ? 'primary' : 'default'}
-                icon={<AppstoreOutlined />}
-                onClick={() => setViewMode('card')}
-              >
-                Thẻ
-              </Button>
-              <Button
-                type={viewMode === 'table' ? 'primary' : 'default'}
-                icon={<UnorderedListOutlined />}
-                onClick={() => setViewMode('table')}
-              >
-                Bảng
-              </Button>
-            </Button.Group>
-            <ButtonExtend
-              onClick={handleAdd}
-              icon={<PlusCircleOutlined />}
-              type="primary"
-            >
-              Thêm mới
-            </ButtonExtend>
-          </Space>
-        }
+      <Tabs 
+        defaultActiveKey="destinations" 
+        activeKey={activeTab}
+        onChange={setActiveTab}
       >
-        {viewMode === 'card' ? (
-          <CardView
-            dataSource={danhSach || []}
-            loading={loading}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        ) : (
-          <TableBase
-            modelName="destination.destination"
-            columns={columns}
-            loading={loading}
-            rowKey="id"
-            scroll={{ x: 1800 }}
-            pagination={{
-              showSizeChanger: true,
-              showTotal: (total: number) => `Tổng số: ${total}`,
-            }}
-            buttons={{ create: false }}
-          />
-        )}
-      </Card>
+        <TabPane 
+          tab={
+            <span>
+              <AppstoreOutlined />
+              Điểm đến
+            </span>
+          } 
+          key="destinations"
+        >
+          {renderDestinationsTab()}
+        </TabPane>
+        <TabPane 
+          tab={
+            <span>
+              <LineChartOutlined />
+              Thống kê
+            </span>
+          } 
+          key="statistics"
+        >
+          <Statistics destinations={danhSach} />
+        </TabPane>
+      </Tabs>
 
       <Modal
         visible={visible}
