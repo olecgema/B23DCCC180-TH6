@@ -1,0 +1,89 @@
+@import '~antd/es/style/themes/default.less';
+
+.container {
+	width: 100%;
+}
+
+.summaryCard {
+	margin-bottom: 24px;
+}
+
+.budgetLimitInfo {
+	margin-top: 12px;
+}
+
+.budgetAlert {
+	margin-top: 16px;
+}
+
+.breakdownCard {
+	margin-bottom: 24px;
+}
+
+.chartContainer {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 300px;
+}
+
+.breakdownList {
+	padding: 0 16px;
+}
+
+.breakdownItem {
+	margin-bottom: 16px;
+
+	&:last-child {
+		margin-bottom: 0;
+	}
+}
+
+.breakdownHeader {
+	display: flex;
+	justify-content: space-between;
+	margin-bottom: 4px;
+}
+
+.breakdownTitle {
+	font-weight: 500;
+}
+
+.breakdownPercent {
+	color: @text-color-secondary;
+}
+
+.breakdownValue {
+	margin-bottom: 8px;
+	color: @text-color-secondary;
+}
+
+.destinationsCard {
+	margin-bottom: 24px;
+}
+
+.locationText {
+	color: @text-color-secondary;
+	font-size: @font-size-sm;
+}
+
+.tipsCard {
+	margin-bottom: 24px;
+}
+
+// Responsive styles
+@media (max-width: @screen-xs) {
+	.chartContainer {
+		height: 250px;
+	}
+
+	.breakdownList {
+		margin-top: 24px;
+	}
+}
+
+@media (max-width: @screen-sm) {
+	.breakdownList {
+		margin-top: 24px;
+	}
+}

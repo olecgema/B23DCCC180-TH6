@@ -1,6 +1,4 @@
-﻿import component from "@/locales/en-US/component";
-
-export default [
+﻿export default [
 	{
 		path: '/user',
 		layout: false,
@@ -39,7 +37,7 @@ export default [
 		icon: 'ArrowsAltOutlined',
 	},
 	{
-		path:'/QuanTri',
+		path: '/QuanTri',
 		name: 'Quản trị',
 		component: './QuanTri',
 		icon: 'SettingOutlined',
@@ -49,6 +47,27 @@ export default [
 		name: 'Trang chủ',
 		icon: 'HomeOutlined',
 		component: './TrangChu2',
+	},
+
+	// DU LICH ROUTES
+	{
+		name: 'Du lịch',
+		path: '/du-lich',
+		icon: 'CompassOutlined',
+		routes: [
+			{
+				name: 'Tạo lịch trình',
+				path: '/du-lich/TaoDuLich',
+				component: './TaoDuLich',
+				icon: 'CalendarOutlined',
+			},
+			{
+				name: 'Quản lý ngân sách',
+				path: '/du-lich/NganSach',
+				component: './NganSach',
+				icon: 'DollarOutlined',
+			},
+		],
 	},
 
 	// DANH MUC HE THONG
