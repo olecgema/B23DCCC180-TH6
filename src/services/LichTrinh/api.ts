@@ -1,6 +1,7 @@
 import type { ItineraryItem } from '@/models/trip-planner';
+import axios from '@/utils/axios';
 
-const STORAGE_KEY = 'travel_itineraries';
+const ITINERARIES_API = 'https://681d6a7cf74de1d219afaa71.mockapi.io/itineraries';
 
 interface Itinerary {
 	id: string;
@@ -15,8 +16,8 @@ interface Itinerary {
  */
 export async function getItineraries() {
 	try {
-		const itineraries = localStorage.getItem(STORAGE_KEY);
-		return { data: itineraries ? JSON.parse(itineraries) : [] };
+		const response = await axios.get(ITINERARIES_API);
+		return { data: response.data || [] };
 	} catch (error) {
 		console.error('Error fetching itineraries:', error);
 		throw error;
@@ -28,10 +29,8 @@ export async function getItineraries() {
  */
 export async function getItineraryById(id: string) {
 	try {
-		const itineraries = localStorage.getItem(STORAGE_KEY);
-		const allItineraries = itineraries ? JSON.parse(itineraries) : [];
-		const itinerary = allItineraries.find((item: Itinerary) => item.id === id);
-		return { data: itinerary };
+		const response = await axios.get(`${ITINERARIES_API}/${id}`);
+		return { data: response.data };
 	} catch (error) {
 		console.error(`Error fetching itinerary with ID ${id}:`, error);
 		throw error;
@@ -48,18 +47,8 @@ export async function createItinerary(payload: {
 	destinations: ItineraryItem[];
 }) {
 	try {
-		const itineraries = localStorage.getItem(STORAGE_KEY);
-		const allItineraries = itineraries ? JSON.parse(itineraries) : [];
-
-		const newItinerary = {
-			id: Date.now().toString(), // Tạo ID đơn giản bằng timestamp
-			...payload,
-		};
-
-		allItineraries.push(newItinerary);
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(allItineraries));
-
-		return { data: newItinerary };
+		const response = await axios.post(ITINERARIES_API, payload);
+		return { data: response.data };
 	} catch (error) {
 		console.error('Error creating itinerary:', error);
 		throw error;
@@ -79,21 +68,8 @@ export async function updateItinerary(
 	},
 ) {
 	try {
-		const itineraries = localStorage.getItem(STORAGE_KEY);
-		const allItineraries = itineraries ? JSON.parse(itineraries) : [];
-
-		const index = allItineraries.findIndex((item: Itinerary) => item.id === id);
-		if (index === -1) {
-			throw new Error('Itinerary not found');
-		}
-
-		allItineraries[index] = {
-			...allItineraries[index],
-			...payload,
-		};
-
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(allItineraries));
-		return { data: allItineraries[index] };
+		const response = await axios.put(`${ITINERARIES_API}/${id}`, payload);
+		return { data: response.data };
 	} catch (error) {
 		console.error(`Error updating itinerary with ID ${id}:`, error);
 		throw error;
@@ -105,13 +81,8 @@ export async function updateItinerary(
  */
 export async function deleteItinerary(id: string) {
 	try {
-		const itineraries = localStorage.getItem(STORAGE_KEY);
-		const allItineraries = itineraries ? JSON.parse(itineraries) : [];
-
-		const filteredItineraries = allItineraries.filter((item: Itinerary) => item.id !== id);
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(filteredItineraries));
-
-		return { data: { id } };
+		const response = await axios.delete(`${ITINERARIES_API}/${id}`);
+		return { data: response.data };
 	} catch (error) {
 		console.error(`Error deleting itinerary with ID ${id}:`, error);
 		throw error;

@@ -1,6 +1,14 @@
 import { Dispatch, AnyAction } from 'redux';
 import { message } from 'antd';
 import { getDestinations, getDestinationById } from '@/services/DiemDen/api';
+import {
+	createItinerary,
+	getItineraries,
+	updateItinerary,
+	deleteItinerary,
+	getItineraryById,
+} from '@/services/LichTrinh/api';
+import { createBudget, getBudgetByItineraryId, updateBudget } from '@/services/NganSach/api';
 
 export interface ActionWithPayload<T = any> extends AnyAction {
 	payload: T;
@@ -37,6 +45,8 @@ export interface TripState {
 	budget: Budget;
 	budgetLimit: number;
 	loading: boolean;
+	currentItineraryId: string;
+	currentBudgetId: string;
 }
 
 export interface TripModelType {
@@ -49,6 +59,10 @@ export interface TripModelType {
 		reorderItinerary: Effect;
 		updateBudget: Effect;
 		setBudgetLimit: Effect;
+		saveItineraryToApi: Effect;
+		fetchItineraryFromApi: Effect;
+		saveBudgetToApi: Effect;
+		fetchBudgetFromApi: Effect;
 	};
 	reducers: {
 		saveDestinations: Reducer<TripState>;
@@ -56,6 +70,8 @@ export interface TripModelType {
 		saveBudget: Reducer<TripState>;
 		saveBudgetLimit: Reducer<TripState>;
 		setLoading: Reducer<TripState>;
+		setCurrentItineraryId: Reducer<TripState>;
+		setCurrentBudgetId: Reducer<TripState>;
 	};
 }
 
@@ -74,6 +90,8 @@ const TripModel: TripModelType = {
 		},
 		budgetLimit: 0,
 		loading: false,
+		currentItineraryId: '',
+		currentBudgetId: '',
 	},
 
 	effects: {
@@ -196,6 +214,175 @@ const TripModel: TripModelType = {
 				payload: action.payload,
 			});
 		},
+
+		*saveItineraryToApi(action: AnyAction, { call, put, select }: { call: any; put: any; select: any }) {
+			yield put({ type: 'setLoading', payload: true });
+			try {
+				const { name, startDate, endDate } = action.payload || {};
+				const state = yield select((state: any) => state.trip);
+				const { selectedDestinations, currentItineraryId } = state as TripState;
+
+				const payload = {
+					name,
+					startDate,
+					endDate,
+					destinations: selectedDestinations,
+				};
+
+				let response: any;
+				if (currentItineraryId) {
+					// Update existing itinerary
+					response = yield call(updateItinerary, currentItineraryId, payload);
+				} else {
+					// Create new itinerary
+					response = yield call(createItinerary, payload);
+					// Save the new ID
+					yield put({
+						type: 'setCurrentItineraryId',
+						payload: response.data.id,
+					});
+
+					// Also save a new budget for this itinerary
+					yield put({
+						type: 'saveBudgetToApi',
+						payload: {
+							itineraryId: response.data.id,
+						},
+					});
+				}
+
+				message.success('Lịch trình đã được lưu!');
+			} catch (error) {
+				message.error('Không thể lưu lịch trình!');
+				console.error('Error saving itinerary:', error);
+			} finally {
+				yield put({ type: 'setLoading', payload: false });
+			}
+		},
+
+		*fetchItineraryFromApi(action: AnyAction, { call, put }: { call: any; put: any }) {
+			yield put({ type: 'setLoading', payload: true });
+			try {
+				const { itineraryId } = action.payload || {};
+
+				if (!itineraryId) {
+					return;
+				}
+
+				// Use direct API call to get specific itinerary by ID instead of fetching all
+				const response: any = yield call(getItineraryById, itineraryId);
+				const itinerary = response.data;
+
+				if (itinerary) {
+					yield put({
+						type: 'saveItinerary',
+						payload: itinerary.destinations || [],
+					});
+
+					yield put({
+						type: 'setCurrentItineraryId',
+						payload: itineraryId,
+					});
+
+					// Also fetch the budget for this itinerary
+					yield put({
+						type: 'fetchBudgetFromApi',
+						payload: {
+							itineraryId,
+						},
+					});
+				}
+			} catch (error) {
+				message.error('Không thể tải lịch trình!');
+				console.error('Error fetching itinerary:', error);
+			} finally {
+				yield put({ type: 'setLoading', payload: false });
+			}
+		},
+
+		*saveBudgetToApi(action: AnyAction, { call, put, select }: { call: any; put: any; select: any }) {
+			yield put({ type: 'setLoading', payload: true });
+			try {
+				const { itineraryId } = action.payload || {};
+				const state = yield select((state: any) => state.trip);
+				const { budget, budgetLimit, currentBudgetId, currentItineraryId } = state as TripState;
+
+				const finalItineraryId = itineraryId || currentItineraryId;
+				if (!finalItineraryId) {
+					message.warning('Vui lòng lưu lịch trình trước khi lưu ngân sách!');
+					return;
+				}
+
+				const payload = {
+					itineraryId: finalItineraryId,
+					budgetLimit,
+					categories: budget,
+				};
+
+				let response: any;
+				if (currentBudgetId) {
+					// Update existing budget
+					response = yield call(updateBudget, currentBudgetId, payload);
+				} else {
+					// Create new budget
+					response = yield call(createBudget, payload);
+					// Save the new ID
+					yield put({
+						type: 'setCurrentBudgetId',
+						payload: response.data.id,
+					});
+				}
+
+				message.success('Ngân sách đã được lưu!');
+			} catch (error) {
+				message.error('Không thể lưu ngân sách!');
+				console.error('Error saving budget:', error);
+			} finally {
+				yield put({ type: 'setLoading', payload: false });
+			}
+		},
+
+		*fetchBudgetFromApi(action: AnyAction, { call, put }: { call: any; put: any }) {
+			yield put({ type: 'setLoading', payload: true });
+			try {
+				const { itineraryId } = action.payload || {};
+
+				if (!itineraryId) {
+					return;
+				}
+
+				const response: any = yield call(getBudgetByItineraryId, itineraryId);
+				const budget = response.data;
+
+				if (budget) {
+					yield put({
+						type: 'saveBudget',
+						payload: budget.categories || {
+							food: 0,
+							accommodation: 0,
+							transportation: 0,
+							activities: 0,
+							other: 0,
+						},
+					});
+
+					yield put({
+						type: 'saveBudgetLimit',
+						payload: budget.budgetLimit || 0,
+					});
+
+					yield put({
+						type: 'setCurrentBudgetId',
+						payload: budget.id,
+					});
+				}
+			} catch (error) {
+				message.error('Không thể tải ngân sách!');
+				console.error('Error fetching budget:', error);
+			} finally {
+				yield put({ type: 'setLoading', payload: false });
+			}
+		},
 	},
 
 	reducers: {
@@ -231,6 +418,20 @@ const TripModel: TripModelType = {
 			return {
 				...state,
 				loading: payload,
+			};
+		},
+
+		setCurrentItineraryId(state, { payload }) {
+			return {
+				...state,
+				currentItineraryId: payload,
+			};
+		},
+
+		setCurrentBudgetId(state, { payload }) {
+			return {
+				...state,
+				currentBudgetId: payload,
 			};
 		},
 	},

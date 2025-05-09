@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PageContainer } from '@ant-design/pro-layout';
-import { connect, Dispatch, Link } from 'umi';
+import { connect, Dispatch, Link, history, useLocation } from 'umi';
 import {
 	Card,
 	Row,
@@ -17,8 +17,17 @@ import {
 	Space,
 	Tabs,
 	Tag,
+	Spin,
+	message,
+	Empty,
 } from 'antd';
-import { ArrowLeftOutlined, DollarOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import {
+	ArrowLeftOutlined,
+	DollarOutlined,
+	ExclamationCircleOutlined,
+	SaveOutlined,
+	LoadingOutlined,
+} from '@ant-design/icons';
 import { TripState } from '@/models/trip-planner';
 import DonutChart from '@/components/Chart/DonutChart';
 import styles from './styles.less';
@@ -29,6 +38,7 @@ const { TabPane } = Tabs;
 interface BudgetProps {
 	trip: TripState;
 	dispatch: Dispatch;
+	loading: boolean;
 }
 
 interface ChartDataItem {
@@ -51,10 +61,11 @@ interface DestinationBudget {
 	order: number;
 }
 
-const NganSach: React.FC<BudgetProps> = ({ trip, dispatch }) => {
+const NganSach: React.FC<BudgetProps> = ({ trip, dispatch, loading }) => {
 	const [budgetForm] = Form.useForm();
 	const [budgetLimit, setBudgetLimit] = useState<number>(trip.budgetLimit || 0);
 	const [isOverBudget, setIsOverBudget] = useState<boolean>(false);
+	const location = useLocation();
 
 	useEffect(() => {
 		// If we don't have destinations yet, fetch them
@@ -64,11 +75,22 @@ const NganSach: React.FC<BudgetProps> = ({ trip, dispatch }) => {
 			});
 		}
 
-		// Calculate budget
-		dispatch({
-			type: 'trip/updateBudget',
-		});
-	}, [dispatch, trip.destinations]);
+		// If we have a current itinerary ID, always fetch its budget data
+		if (trip.currentItineraryId) {
+			// Calculate budget
+			dispatch({
+				type: 'trip/updateBudget',
+			});
+
+			// Fetch budget data from API
+			dispatch({
+				type: 'trip/fetchBudgetFromApi',
+				payload: {
+					itineraryId: trip.currentItineraryId,
+				},
+			});
+		}
+	}, [dispatch, trip.destinations, trip.currentItineraryId]);
 
 	useEffect(() => {
 		// Set initial form values
@@ -81,13 +103,48 @@ const NganSach: React.FC<BudgetProps> = ({ trip, dispatch }) => {
 		setIsOverBudget(totalBudget > trip.budgetLimit && trip.budgetLimit > 0);
 	}, [trip.budget, trip.budgetLimit, budgetForm]);
 
+	// Thêm useEffect để kiểm tra nếu không có lịch trình hiện tại
+	useEffect(() => {
+		if (!trip.currentItineraryId) {
+			// Không có lịch trình nào đang được chọn, reset form
+			budgetForm.setFieldsValue({
+				budgetLimit: 0,
+			});
+		}
+	}, [trip.currentItineraryId, budgetForm]);
+
+	// Remove or update the useEffect that checks for navigation
+	useEffect(() => {
+		const state = (location.state as { from?: string }) || {};
+		if (state.from === 'TaoDuLich') {
+			// No need to do anything additional since we always load budget data
+			// when trip.currentItineraryId exists in the above useEffect
+		}
+	}, [location]);
+
 	const handleSetBudgetLimit = (values: { budgetLimit: number }) => {
 		const { budgetLimit } = values;
 		setBudgetLimit(budgetLimit);
 
+		// Update in redux store
 		dispatch({
 			type: 'trip/setBudgetLimit',
 			payload: budgetLimit,
+		});
+
+		// Save to API
+		saveBudgetToApi();
+	};
+
+	const saveBudgetToApi = () => {
+		if (!trip.currentItineraryId) {
+			message.warning('Vui lòng lưu lịch trình trước khi lưu ngân sách!');
+			return;
+		}
+
+		dispatch({
+			type: 'trip/saveBudgetToApi',
+			payload: {},
 		});
 	};
 
@@ -188,30 +245,33 @@ const NganSach: React.FC<BudgetProps> = ({ trip, dispatch }) => {
 	const renderBudgetBreakdown = () => {
 		const totalBudget = calculateTotalBudget();
 
+		// Ensure each category has at least a minimum value for display
+		const ensureMinimumValue = (value: number) => (value < 0.01 ? 0.01 : value);
+
 		const chartData: ChartDataItem[] = [
 			{
 				type: 'Ăn uống',
-				value: trip.budget.food,
+				value: ensureMinimumValue(trip.budget.food),
 				percent: calculateBudgetPercentage('food'),
 			},
 			{
 				type: 'Lưu trú',
-				value: trip.budget.accommodation,
+				value: ensureMinimumValue(trip.budget.accommodation),
 				percent: calculateBudgetPercentage('accommodation'),
 			},
 			{
 				type: 'Di chuyển',
-				value: trip.budget.transportation,
+				value: ensureMinimumValue(trip.budget.transportation),
 				percent: calculateBudgetPercentage('transportation'),
 			},
 			{
 				type: 'Hoạt động',
-				value: trip.budget.activities,
+				value: ensureMinimumValue(trip.budget.activities),
 				percent: calculateBudgetPercentage('activities'),
 			},
 			{
 				type: 'Khác',
-				value: trip.budget.other,
+				value: ensureMinimumValue(trip.budget.other),
 				percent: calculateBudgetPercentage('other'),
 			},
 		];
@@ -263,40 +323,48 @@ const NganSach: React.FC<BudgetProps> = ({ trip, dispatch }) => {
 						<Row>
 							<Col xs={24} md={12}>
 								<div className={styles.chartContainer}>
-									<DonutChart
-										xAxis={chartData.map((item) => item.type)}
-										yAxis={[chartData.map((item) => item.value)]}
-										yLabel={chartData.map((item) => item.type)}
-										height={300}
-										showTotal={true}
-										formatY={(val) => val.toLocaleString('vi-VN') + 'đ'}
-										otherOptions={{
-											plotOptions: {
-												pie: {
-													donut: {
-														labels: {
-															show: true,
-															name: {
-																show: true,
-															},
-															value: {
-																show: true,
-																formatter: () => totalBudget.toLocaleString('vi-VN') + 'đ',
-															},
-															total: {
-																show: true,
-																label: 'Tổng chi phí',
-																formatter: () => totalBudget.toLocaleString('vi-VN') + 'đ',
+									{totalBudget > 0 ? (
+										<>
+											<div className={styles.totalBudgetDisplay}>
+												<div className={styles.totalBudgetLabel}>Tổng chi phí</div>
+												<div className={styles.totalBudgetValue}>{totalBudget.toLocaleString('vi-VN')}đ</div>
+											</div>
+											<DonutChart
+												xAxis={chartData.map((item) => item.type)}
+												yAxis={[chartData.map((item) => item.value)]}
+												yLabel={chartData.map((item) => item.type)}
+												height={300}
+												showTotal={true}
+												formatY={(val) => val.toLocaleString('vi-VN') + 'đ'}
+												otherOptions={{
+													plotOptions: {
+														pie: {
+															donut: {
+																size: '70%',
+																labels: {
+																	show: true,
+																	total: {
+																		show: true,
+																		showAlways: true,
+																		label: 'Tổng chi phí',
+																		formatter: () => totalBudget.toLocaleString('vi-VN') + 'đ',
+																	},
+																},
 															},
 														},
 													},
-												},
-											},
-											legend: {
-												position: 'bottom',
-											},
-										}}
-									/>
+													legend: {
+														position: 'bottom',
+													},
+													dataLabels: {
+														enabled: false,
+													},
+												}}
+											/>
+										</>
+									) : (
+										<Empty description='Chưa có dữ liệu chi phí' />
+									)}
 								</div>
 							</Col>
 							<Col xs={24} md={12}>
@@ -572,31 +640,54 @@ const NganSach: React.FC<BudgetProps> = ({ trip, dispatch }) => {
 		);
 	};
 
+	// Hàm trở về trang lịch trình
+	const goBackToItinerary = () => {
+		history.push('/du-lich/TaoDuLich', { from: 'NganSach' });
+	};
+
 	return (
 		<PageContainer
 			title='Quản lý ngân sách du lịch'
 			content='Theo dõi và kiểm soát chi phí cho chuyến đi của bạn'
 			extra={[
-				<Link to='/du-lich/TaoDuLich' key='back'>
-					<Button icon={<ArrowLeftOutlined />}>Quay lại lịch trình</Button>
-				</Link>,
+				<Button key='back' icon={<ArrowLeftOutlined />} onClick={goBackToItinerary}>
+					Quay lại lịch trình
+				</Button>,
 			]}
 		>
-			<div className={styles.container}>
-				<Row gutter={[24, 24]}>
-					<Col xs={24}>{renderBudgetSummary()}</Col>
-
-					<Col xs={24}>{renderBudgetBreakdown()}</Col>
-
-					<Col xs={24}>{renderDestinationBudget()}</Col>
-
-					<Col xs={24}>{renderTips()}</Col>
-				</Row>
-			</div>
+			<Spin spinning={loading} indicator={<LoadingOutlined />}>
+				<div className={styles.container}>
+					{!trip.currentItineraryId ? (
+						<Card>
+							<Empty
+								description='Vui lòng chọn hoặc tạo một lịch trình trước khi quản lý ngân sách'
+								image={Empty.PRESENTED_IMAGE_SIMPLE}
+							>
+								<Button type='primary' onClick={goBackToItinerary}>
+									Tạo lịch trình mới
+								</Button>
+							</Empty>
+						</Card>
+					) : (
+						<Row gutter={[24, 24]}>
+							<Col xs={24}>{renderBudgetSummary()}</Col>
+							<Col xs={24}>{renderBudgetBreakdown()}</Col>
+							<Col xs={24}>{renderDestinationBudget()}</Col>
+							<Col xs={24}>{renderTips()}</Col>
+						</Row>
+					)}
+				</div>
+			</Spin>
 		</PageContainer>
 	);
 };
 
-export default connect(({ trip }: { trip: TripState }) => ({
+export default connect(({ trip, loading }: { trip: TripState; loading: { effects: Record<string, boolean> } }) => ({
 	trip,
+	loading: !!(
+		loading.effects['trip/updateBudget'] ||
+		loading.effects['trip/setBudgetLimit'] ||
+		loading.effects['trip/saveBudgetToApi'] ||
+		loading.effects['trip/fetchBudgetFromApi']
+	),
 }))(NganSach);
