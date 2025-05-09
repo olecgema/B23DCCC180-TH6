@@ -53,6 +53,35 @@ const TaoDuLich: React.FC<TaoDuLichProps> = ({ trip, dispatch, loading }) => {
 			return;
 		}
 
+		// Check if adding this destination would exceed 24 hours for the day
+		const selectedDest = trip.destinations.find((d) => d.id === selectedDestination);
+		if (selectedDest) {
+			// Calculate current hours for this day
+			const dayItems = trip.selectedDestinations.filter((item) => item.day === selectedDay);
+			let currentDayHours = 0;
+
+			dayItems.forEach((item) => {
+				const dest = trip.destinations.find((d) => d.id === item.destinationId);
+				if (dest) {
+					currentDayHours += dest.visitDuration;
+				}
+			});
+
+			// Add travel time between existing destinations
+			currentDayHours += Math.max(0, dayItems.length - 1);
+
+			// Calculate new total hours with the destination we want to add
+			const newTotalHours = currentDayHours + selectedDest.visitDuration + (dayItems.length > 0 ? 1 : 0);
+
+			// Check if it would exceed 24 hours
+			if (newTotalHours > 24) {
+				message.error(
+					`Không thể thêm điểm đến này vào ngày ${selectedDay}. Tổng thời gian sẽ vượt quá 24 tiếng (${newTotalHours} tiếng).`,
+				);
+				return;
+			}
+		}
+
 		const dayItinerary = trip.selectedDestinations.filter((item) => item.day === selectedDay);
 		const order = dayItinerary.length + 1;
 
@@ -301,15 +330,38 @@ const TaoDuLich: React.FC<TaoDuLichProps> = ({ trip, dispatch, loading }) => {
 		// In a real application, you would likely use a service to calculate travel times
 		let totalHours = 0;
 
+		// Group destinations by day
+		const destinationsByDay: Record<number, ItineraryItem[]> = {};
 		trip.selectedDestinations.forEach((item) => {
-			const destination = trip.destinations.find((d) => d.id === item.destinationId);
-			if (destination) {
-				totalHours += destination.visitDuration;
+			if (!destinationsByDay[item.day]) {
+				destinationsByDay[item.day] = [];
 			}
+			destinationsByDay[item.day].push(item);
 		});
 
-		// Add 1 hour of travel time between destinations
-		totalHours += Math.max(0, trip.selectedDestinations.length - tripDays);
+		// Calculate hours for each day and check if any day exceeds 24 hours
+		Object.keys(destinationsByDay).forEach((dayKey) => {
+			const day = parseInt(dayKey, 10);
+			let dayHours = 0;
+			destinationsByDay[day].forEach((item) => {
+				const destination = trip.destinations.find((d) => d.id === item.destinationId);
+				if (destination) {
+					dayHours += destination.visitDuration;
+				}
+			});
+
+			// Add travel time between destinations for this day
+			dayHours += Math.max(0, destinationsByDay[day].length - 1);
+
+			// If a day has more than 24 hours of activities, show a warning
+			if (dayHours > 24) {
+				message.warning(`Ngày ${day} có tổng thời gian hoạt động ${dayHours} tiếng, vượt quá 24 tiếng trong một ngày.`);
+				// Limit this day's contribution to total to 24 hours
+				dayHours = 24;
+			}
+
+			totalHours += dayHours;
+		});
 
 		return totalHours;
 	};
